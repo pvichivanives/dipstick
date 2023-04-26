@@ -18,7 +18,8 @@ use std::fmt::Debug;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-
+/// Use a safe maximum size for UDP to prevent fragmentation.
+const MAX_UDP_PAYLOAD: usize = 576;
 
 #[cfg(not(feature = "parking_lot"))]
 use std::sync::{RwLock, RwLockWriteGuard};
@@ -41,7 +42,7 @@ impl Input for Graphite {
     fn metrics(&self) -> Self::SCOPE {
         GraphiteScope {
             attributes: self.attributes.clone(),
-            buffer: Arc::new(RwLock::new(String::new())),
+            buffer: Arc::new(RwLock::new(String::with_capacity(MAX_UDP_PAYLOAD))),
             socket: self.socket.clone(),
         }
     }
