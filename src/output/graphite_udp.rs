@@ -28,19 +28,19 @@ use std::sync::{RwLock, RwLockWriteGuard};
 use parking_lot::{RwLock, RwLockWriteGuard};
 use std::io;
 
-/// Graphite Input holds a socket to a graphite server.
+/// GraphiteUdp Input holds a socket to a graphite server.
 /// The socket is shared between scopes opened from the Input.
 #[derive(Clone, Debug)]
-pub struct Graphite {
+pub struct GraphiteUdp {
     attributes: Attributes,
     socket: Arc<UdpSocket>,
 }
 
-impl Input for Graphite {
-    type SCOPE = GraphiteScope;
+impl Input for GraphiteUdp {
+    type SCOPE = GraphiteUdpScope;
 
     fn metrics(&self) -> Self::SCOPE {
-        GraphiteScope {
+        GraphiteUdpScope {
             attributes: self.attributes.clone(),
             buffer: Arc::new(RwLock::new(String::new())),
             socket: self.socket.clone(),
@@ -48,21 +48,21 @@ impl Input for Graphite {
     }
 }
 
-impl Graphite {
+impl GraphiteUdp {
     /// Send metrics to a graphite server at the address and port provided.
-    pub fn send_to<ADDR: ToSocketAddrs>(address: ADDR) -> io::Result<Graphite> {
+    pub fn send_to<ADDR: ToSocketAddrs>(address: ADDR) -> io::Result<GraphiteUdp> {
         let socket = Arc::new(UdpSocket::bind("0.0.0.0:0")?);
         socket.set_nonblocking(true)?;
         socket.connect(address)?;
 
-        Ok(Graphite {
+        Ok(GraphiteUdp {
             attributes: Attributes::default(),
             socket,
         })
     }
 }
 
-impl WithAttributes for Graphite {
+impl WithAttributes for GraphiteUdp {
     fn get_attributes(&self) -> &Attributes {
         &self.attributes
     }
@@ -71,17 +71,17 @@ impl WithAttributes for Graphite {
     }
 }
 
-impl Buffered for Graphite {}
+impl Buffered for GraphiteUdp {}
 
-/// Graphite Input
+/// GraphiteUdp Input
 #[derive(Debug, Clone)]
-pub struct GraphiteScope {
+pub struct GraphiteUdpScope {
     attributes: Attributes,
     buffer: Arc<RwLock<String>>,
     socket: Arc<UdpSocket>,
 }
 
-impl InputScope for GraphiteScope {
+impl InputScope for GraphiteUdpScope {
     /// Define a metric of the specified type.
     fn new_metric(&self, name: MetricName, kind: InputKind) -> InputMetric {
         let mut prefix = self.prefix_prepend(name.clone()).join(".");
@@ -94,7 +94,7 @@ impl InputScope for GraphiteScope {
         };
 
         let cloned = self.clone();
-        let metric = GraphiteMetric { prefix, scale };
+        let metric = GraphiteUdpMetric { prefix, scale };
         let metric_id = MetricId::forge("graphite", name);
 
         InputMetric::new(metric_id, move |value, _labels| {
@@ -103,7 +103,7 @@ impl InputScope for GraphiteScope {
     }
 }
 
-impl Flush for GraphiteScope {
+impl Flush for GraphiteUdpScope {
     fn flush(&self) -> io::Result<()> {
         self.notify_flush_listeners();
         let buf = write_lock!(self.buffer);
@@ -111,8 +111,8 @@ impl Flush for GraphiteScope {
     }
 }
 
-impl GraphiteScope {
-    fn print(&self, metric: &GraphiteMetric, value: MetricValue) {
+impl GraphiteUdpScope {
+    fn print(&self, metric: &GraphiteUdpMetric, value: MetricValue) {
         let scaled_value = value / metric.scale;
         let value_str = scaled_value.to_string();
 
@@ -129,7 +129,7 @@ impl GraphiteScope {
 
                 if buffer.len() > BUFFER_FLUSH_THRESHOLD {
                     metrics::GRAPHITE_OVERFLOW.mark();
-                    warn!("Graphite Buffer Size Exceeded: {}", BUFFER_FLUSH_THRESHOLD);
+                    warn!("GraphiteUdp Buffer Size Exceeded: {}", BUFFER_FLUSH_THRESHOLD);
                     let _ = self.flush_inner(buffer);
                     buffer = write_lock!(self.buffer);
                 }
@@ -166,7 +166,7 @@ impl GraphiteScope {
 
 }
 
-impl WithAttributes for GraphiteScope {
+impl WithAttributes for GraphiteUdpScope {
     fn get_attributes(&self) -> &Attributes {
         &self.attributes
     }
@@ -175,10 +175,10 @@ impl WithAttributes for GraphiteScope {
     }
 }
 
-impl Buffered for GraphiteScope {}
+impl Buffered for GraphiteUdpScope {}
 
-impl QueuedInput for Graphite {}
-impl CachedInput for Graphite {}
+impl QueuedInput for GraphiteUdp {}
+impl CachedInput for GraphiteUdp {}
 
 /// Its hard to see how a single scope could get more metrics than this.
 // TODO make configurable?
@@ -186,13 +186,13 @@ const BUFFER_FLUSH_THRESHOLD: usize = 65_536;
 
 /// Key of a graphite metric.
 #[derive(Debug, Clone)]
-pub struct GraphiteMetric {
+pub struct GraphiteUdpMetric {
     prefix: String,
     scale: isize,
 }
 
 /// Any remaining buffered data is flushed on Drop.
-impl Drop for GraphiteScope {
+impl Drop for GraphiteUdpScope {
     fn drop(&mut self) {
         if let Err(err) = self.flush() {
             warn!("Could not flush graphite metrics upon Drop: {}", err)
@@ -209,7 +209,7 @@ mod bench {
 
     #[bench]
     pub fn immediate_graphite(b: &mut test::Bencher) {
-        let sd = Graphite::send_to("localhost:2003").unwrap().metrics();
+        let sd = GraphiteUdp::send_to("localhost:2003").unwrap().metrics();
         let timer = sd.new_metric("timer".into(), InputKind::Timer);
 
         b.iter(|| test::black_box(timer.write(2000, labels![])));
@@ -217,7 +217,7 @@ mod bench {
 
     #[bench]
     pub fn buffering_graphite(b: &mut test::Bencher) {
-        let sd = Graphite::send_to("localhost:2003")
+        let sd = GraphiteUdp::send_to("localhost:2003")
             .unwrap()
             .buffered(Buffering::BufferSize(65465))
             .metrics();
