@@ -129,12 +129,15 @@ impl GraphiteUdpScope {
                 );
                 let entry_len = metric.len();
                 let available = buffer.capacity() - buffer.len();
+                println!("entry len {entry_len}"); 
+                println!("avail {available}"); 
                 if entry_len > buffer.capacity() {
                     // entry simply too  big to fit in buffer
                     return;
                 }
                 if entry_len > available {
                     // flush buffer to make room 
+                    println!("flushed"); 
                     let _ = self.flush_inner(buffer);
                     buffer = write_lock!(self.buffer);
                 } 
