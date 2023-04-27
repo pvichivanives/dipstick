@@ -134,12 +134,11 @@ impl GraphiteUdpScope {
                     return;
                 }
                 if entry_len > available {
-                    // can't fit in buffer
-                    // flush buffer
+                    // flush buffer to make room 
                     let _ = self.flush_inner(buffer);
                     buffer = write_lock!(self.buffer);
                 } 
-                    buffer.push_str(&metric);
+                buffer.push_str(&metric);
                 
             }
             Err(e) => {
