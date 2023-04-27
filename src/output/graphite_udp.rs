@@ -142,6 +142,9 @@ impl GraphiteUdpScope {
                     buffer = write_lock!(self.buffer);
                 } 
                 buffer.push_str(&metric);
+                let available2 = buffer.capacity() - buffer.len();
+                println!("avail after {available2}");
+                println!("{:?}", buffer); 
                 
             }
             Err(e) => {
