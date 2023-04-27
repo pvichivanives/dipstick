@@ -130,20 +130,20 @@ impl GraphiteUdpScope {
                 return; 
             }
             if entry_len > available {
-                // buffer is nearly full, make room
-                //send what u got and then fill buffer up again 
+                // can't fit in buffer
+                // flush buffer 
                 let _ = self.flush_inner(buffer);
                 buffer = write_lock!(self.buffer);
-             } else {
+             } 
                 buffer.push_str(&metric); 
-            }
+            
         }
             Err(e) => {
                 warn!("Could not compute epoch timestamp. {}", e);
             }
         };
 
-        if !self.is_buffered() {
+        if !self.is_buffered() { 
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
