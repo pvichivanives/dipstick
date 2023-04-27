@@ -132,7 +132,6 @@ impl GraphiteUdpScope {
             if entry_len > available {
                 // buffer is nearly full, make room
                 //send what u got and then fill buffer up again 
-                println!("too big flushing buffer"); 
                 let _ = self.flush_inner(buffer);
                 buffer = write_lock!(self.buffer);
              } else {
