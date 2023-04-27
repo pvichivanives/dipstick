@@ -161,6 +161,7 @@ impl GraphiteUdpScope {
     }
 
     fn flush_inner(&self, mut buffer: RwLockWriteGuard<String>) -> io::Result<()> {
+        println!("buffer is being flushed");
         if !buffer.is_empty() {
             match self.socket.send(buffer.as_bytes()) {
                 Ok(size) => {
