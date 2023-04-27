@@ -150,6 +150,7 @@ impl GraphiteUdpScope {
         };
 
         if self.is_buffered() {
+            println!("buffered"); 
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
