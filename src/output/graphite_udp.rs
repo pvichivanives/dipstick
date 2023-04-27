@@ -11,10 +11,9 @@ use crate::{Flush, MetricValue};
 
 use std::net::ToSocketAddrs;
 
-
+use std::fmt::Debug;
 use std::net::UdpSocket;
 use std::sync::Arc;
-use std::fmt::Debug;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -24,7 +23,6 @@ use std::sync::{RwLock, RwLockWriteGuard};
 #[cfg(feature = "parking_lot")]
 use parking_lot::{RwLock, RwLockWriteGuard};
 use std::io;
-
 
 /// Use a safe maximum size for UDP to prevent fragmentation.
 const MAX_UDP_PAYLOAD: usize = 576;
@@ -116,40 +114,40 @@ impl GraphiteUdpScope {
     fn print(&self, metric: &GraphiteUdpMetric, value: MetricValue) {
         let scaled_value = value / metric.scale;
         let value_str = scaled_value.to_string();
-        println!("sending metrics"); 
         let start = SystemTime::now();
-       
+
         let mut buffer = write_lock!(self.buffer);
 
         match start.duration_since(UNIX_EPOCH) {
             Ok(timestamp) => {
-                let metric = format!("{}{}{}{}\n", &metric.prefix, &value_str,' ', &timestamp.as_secs().to_string()); 
-                println!("{metric}"); 
-                let entry_len = metric.len(); 
+                let metric = format!(
+                    "{}{}{}{}\n",
+                    &metric.prefix,
+                    &value_str,
+                    ' ',
+                    &timestamp.as_secs().to_string()
+                );
+                let entry_len = metric.len();
                 let available = buffer.capacity() - buffer.len();
-            if entry_len > buffer.capacity(){ // entry simply too  big to fit in buffer 
-                return; 
+                if entry_len > buffer.capacity() {
+                    // entry simply too  big to fit in buffer
+                    return;
+                }
+                if entry_len > available {
+                    // can't fit in buffer
+                    // flush buffer
+                    let _ = self.flush_inner(buffer);
+                    buffer = write_lock!(self.buffer);
+                } 
+                    buffer.push_str(&metric);
+                
             }
-            if entry_len > available {
-                // can't fit in buffer
-                // flush buffer 
-                let _ = self.flush_inner(buffer);
-                buffer = write_lock!(self.buffer);
-             } 
-             else{
-
-             
-                buffer.push_str(&metric); 
-
-             }
-            
-        }
             Err(e) => {
                 warn!("Could not compute epoch timestamp. {}", e);
             }
         };
 
-        if self.is_buffered() { 
+        if self.is_buffered() {
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
@@ -166,14 +164,13 @@ impl GraphiteUdpScope {
                 Err(e) => {
                     metrics::GRAPHITE_SEND_ERR.mark();
                     debug!("Failed to send buffer to graphite: {}", e);
-                    return Err(e)
+                    return Err(e);
                 }
             };
             buffer.clear();
         }
         Ok(())
     }
-
 }
 
 impl WithAttributes for GraphiteUdpScope {
@@ -189,7 +186,6 @@ impl Buffered for GraphiteUdpScope {}
 
 impl QueuedInput for GraphiteUdp {}
 impl CachedInput for GraphiteUdp {}
-
 
 /// Key of a graphite metric.
 #[derive(Debug, Clone)]
