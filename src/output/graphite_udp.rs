@@ -116,14 +116,15 @@ impl GraphiteUdpScope {
     fn print(&self, metric: &GraphiteUdpMetric, value: MetricValue) {
         let scaled_value = value / metric.scale;
         let value_str = scaled_value.to_string();
-
+        println!("sending metrics"); 
         let start = SystemTime::now();
        
         let mut buffer = write_lock!(self.buffer);
 
         match start.duration_since(UNIX_EPOCH) {
             Ok(timestamp) => {
-                let metric = format!("{}{}' '{}\n", &metric.prefix, &value_str, &timestamp.as_secs().to_string()); 
+                let metric = format!("{}{}{}{}\n", &metric.prefix, &value_str,' ', &timestamp.as_secs().to_string()); 
+                println!("{metric}"); 
                 let entry_len = metric.len(); 
                 let available = buffer.capacity() - buffer.len();
             if entry_len > buffer.capacity(){ // entry simply too  big to fit in buffer 
