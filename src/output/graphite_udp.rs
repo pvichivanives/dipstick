@@ -18,15 +18,16 @@ use std::fmt::Debug;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-
-
-
 #[cfg(not(feature = "parking_lot"))]
 use std::sync::{RwLock, RwLockWriteGuard};
 
 #[cfg(feature = "parking_lot")]
 use parking_lot::{RwLock, RwLockWriteGuard};
 use std::io;
+
+
+/// Use a safe maximum size for UDP to prevent fragmentation.
+const MAX_UDP_PAYLOAD: usize = 576;
 
 /// GraphiteUdp Input holds a socket to a graphite server.
 /// The socket is shared between scopes opened from the Input.
@@ -42,7 +43,7 @@ impl Input for GraphiteUdp {
     fn metrics(&self) -> Self::SCOPE {
         GraphiteUdpScope {
             attributes: self.attributes.clone(),
-            buffer: Arc::new(RwLock::new(String::new())),
+            buffer: Arc::new(RwLock::new(String::with_capacity(MAX_UDP_PAYLOAD))),
             socket: self.socket.clone(),
         }
     }
@@ -117,29 +118,33 @@ impl GraphiteUdpScope {
         let value_str = scaled_value.to_string();
 
         let start = SystemTime::now();
-
+       
         let mut buffer = write_lock!(self.buffer);
+
         match start.duration_since(UNIX_EPOCH) {
             Ok(timestamp) => {
-                buffer.push_str(&metric.prefix);
-                buffer.push_str(&value_str);
-                buffer.push(' ');
-                buffer.push_str(&timestamp.as_secs().to_string());
-                buffer.push('\n');
-
-                if buffer.len() > BUFFER_FLUSH_THRESHOLD {
-                    metrics::GRAPHITE_OVERFLOW.mark();
-                    warn!("GraphiteUdp Buffer Size Exceeded: {}", BUFFER_FLUSH_THRESHOLD);
-                    let _ = self.flush_inner(buffer);
-                    buffer = write_lock!(self.buffer);
-                }
+                let metric = format!("{}{}' '{}\n", &metric.prefix, &value_str, &timestamp.as_secs().to_string()); 
+                let entry_len = metric.len(); 
+                let available = buffer.capacity() - buffer.len();
+            if entry_len > buffer.capacity(){ // entry simply too  big to fit in buffer 
+                return; 
             }
+            if entry_len > available {
+                // buffer is nearly full, make room
+                //send what u got and then fill buffer up again 
+                println!("too big flushing buffer"); 
+                let _ = self.flush_inner(buffer);
+                buffer = write_lock!(self.buffer);
+             } else {
+                buffer.push_str(&metric); 
+            }
+        }
             Err(e) => {
                 warn!("Could not compute epoch timestamp. {}", e);
             }
         };
 
-        if self.is_buffered() {
+        if !self.is_buffered() {
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
@@ -180,9 +185,6 @@ impl Buffered for GraphiteUdpScope {}
 impl QueuedInput for GraphiteUdp {}
 impl CachedInput for GraphiteUdp {}
 
-/// Its hard to see how a single scope could get more metrics than this.
-// TODO make configurable?
-const BUFFER_FLUSH_THRESHOLD: usize = 65_536;
 
 /// Key of a graphite metric.
 #[derive(Debug, Clone)]
