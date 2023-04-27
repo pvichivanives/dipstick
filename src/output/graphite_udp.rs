@@ -135,7 +135,12 @@ impl GraphiteUdpScope {
                 let _ = self.flush_inner(buffer);
                 buffer = write_lock!(self.buffer);
              } 
+             else{
+
+             
                 buffer.push_str(&metric); 
+
+             }
             
         }
             Err(e) => {
@@ -143,7 +148,7 @@ impl GraphiteUdpScope {
             }
         };
 
-        if !self.is_buffered() { 
+        if self.is_buffered() { 
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
