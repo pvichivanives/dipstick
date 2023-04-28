@@ -129,31 +129,21 @@ impl GraphiteUdpScope {
                 );
                 let entry_len = metric.len();
                 let available = buffer.capacity() - buffer.len();
-                println!("entry len {entry_len}"); 
-                println!("avail {available}"); 
                 if entry_len > buffer.capacity() {
                     // entry simply too  big to fit in buffer
                     return;
                 }
                 if entry_len > available {
-                    // flush buffer to make room 
-                    println!("flushed"); 
                     let _ = self.flush_inner(buffer);
                     buffer = write_lock!(self.buffer);
                 } 
-                buffer.push_str(&metric);
-                let available2 = buffer.capacity() - buffer.len();
-                println!("avail after {available2}");
-                println!("{:?}", buffer); 
-                
+                buffer.push_str(&metric);                
             }
             Err(e) => {
                 warn!("Could not compute epoch timestamp. {}", e);
             }
         };
-
         if self.is_buffered() {
-            println!("buffered"); 
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
@@ -161,7 +151,6 @@ impl GraphiteUdpScope {
     }
 
     fn flush_inner(&self, mut buffer: RwLockWriteGuard<String>) -> io::Result<()> {
-        println!("buffer is being flushed");
         if !buffer.is_empty() {
             match self.socket.send(buffer.as_bytes()) {
                 Ok(size) => {
