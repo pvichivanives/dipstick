@@ -121,6 +121,11 @@ impl GraphiteUdpScope {
         match start.duration_since(UNIX_EPOCH) {
             Ok(timestamp) => {
                 let metric = format!(
+                   "{}{} {}\n",
+                    &metric.prefix,
+                    &value_str,
+                    &timestamp.as_secs().to_string()
+                );
                     "{}{}{}{}\n",
                     &metric.prefix,
                     &value_str,
