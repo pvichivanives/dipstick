@@ -126,12 +126,6 @@ impl GraphiteUdpScope {
                     &value_str,
                     &timestamp.as_secs().to_string()
                 );
-                    "{}{}{}{}\n",
-                    &metric.prefix,
-                    &value_str,
-                    ' ',
-                    &timestamp.as_secs().to_string()
-                );
                 let entry_len = metric.len();
                 let available = buffer.capacity() - buffer.len();
                 if entry_len > buffer.capacity() {
