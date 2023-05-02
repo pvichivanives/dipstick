@@ -148,7 +148,7 @@ impl GraphiteUdpScope {
                 warn!("Could not compute epoch timestamp. {}", e);
             }
         };
-        if self.is_buffered() {
+        if !self.is_buffered() {
             if let Err(e) = self.flush_inner(buffer) {
                 debug!("Could not send to graphite {}", e)
             }
